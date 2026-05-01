@@ -8,7 +8,6 @@ TTYD_PORT="7681"
 
 mkdir -p "$(dirname "${LOG_FILE}")"
 touch "${LOG_FILE}"
-exec > >(tee -a "${LOG_FILE}") 2>&1
 
 cleanup() {
 	printf '\033[0m\033[2J\033[H'
@@ -18,38 +17,37 @@ cleanup() {
 show_intro() {
 	local ip_addr network_status
 
-	ip_addr="$(hostname -I 2>/dev/null | awk '{print $1}')"
-	if has_network; then
-		network_status="Network detected."
-		ip_addr="${ip_addr:-<pi-ip>}"
-		whiptail \
-			--clear \
-			--backtitle "Pivot First Boot Setup" \
-			--title "Remote Access" \
-			--msgbox "${network_status}\n\nOpen browser to:\n\nhttp://pivot:${TTYD_PORT}\nhttp://pivot.local:${TTYD_PORT}\nhttp://${ip_addr}:${TTYD_PORT}" \
-			19 70
-	else
-		network_status="No network detected.\n\nUse Configure Wi-Fi first."
-		whiptail \
-			--clear \
-			--backtitle "Pivot First Boot Setup" \
-			--title "Remote Access" \
-			--msgbox "${network_status}" \
-			14 60
+	if ! has_network; then
+		return 0
 	fi
+
+	ip_addr="$(hostname -I 2>/dev/null | awk '{print $1}')"
+	network_status="Network detected."
+	ip_addr="${ip_addr:-<pi-ip>}"
+	whiptail \
+		--clear \
+		--backtitle "Pivot First Boot Setup" \
+		--title "Remote Access" \
+		--msgbox "${network_status}\n\nOpen browser to:\n\nhttp://pivot:${TTYD_PORT}\nhttp://pivot.local:${TTYD_PORT}\nhttp://${ip_addr}:${TTYD_PORT}" \
+		19 70
 }
 
 show_menu() {
+	local menu_msg="Select self-host platform to install."
+	if ! has_network; then
+		menu_msg="WARNING: No network detected!\nConfigure Wi-Fi before installing platforms.\n\n${menu_msg}"
+	fi
+
 	whiptail \
 		--clear \
 		--backtitle "Pivot First Boot Setup" \
 		--title "Choose Platform" \
-		--menu "Select self-host platform to install." \
+		--menu "${menu_msg}" \
 		20 70 10 \
-		1 "1. CasaOS" \
-		2 "2. Runtipi" \
-		3 "3. Skip for now" \
-		4 "4. Configure Wi-Fi" \
+		"1" "CasaOS" \
+		"2" "Runtipi" \
+		"3" "Skip for now" \
+		"4" "Configure Wi-Fi" \
 		3>&1 1>&2 2>&3
 }
 
@@ -58,33 +56,33 @@ trap cleanup EXIT INT TERM
 export TERM="${TERM:-xterm-256color}"
 export NEWT_COLORS='
 root=white,black
-window=black,gray
-border=black,gray
-textbox=black,gray
-button=black,gray
+window=black,lightgray
+border=black,lightgray
+textbox=black,lightgray
+button=black,lightgray
 actbutton=white,blue
-title=black,gray
+title=black,lightgray
 roottext=white,black
-entry=black,gray
-label=black,gray
-compactbutton=black,gray
-listbox=black,gray
+entry=black,lightgray
+label=black,lightgray
+compactbutton=black,lightgray
+listbox=black,lightgray
 actsellistbox=white,blue
-sellistbox=black,gray
-checkbox=black,gray
+sellistbox=black,lightgray
+checkbox=black,lightgray
 actcheckbox=white,blue
 '
 
 install_casaos() {
-	echo "Installing CasaOS..."
+	echo "Installing CasaOS..." | tee -a "${LOG_FILE}"
 	ensure_network
-	curl -fsSL https://get.casaos.io | bash
+	curl -fsSL https://get.casaos.io | bash 2>&1 | tee -a "${LOG_FILE}"
 }
 
 install_runtipi() {
-	echo "Installing Runtipi..."
+	echo "Installing Runtipi..." | tee -a "${LOG_FILE}"
 	ensure_network
-	curl -L https://setup.runtipi.io | bash
+	curl -L https://setup.runtipi.io | bash 2>&1 | tee -a "${LOG_FILE}"
 }
 
 has_network() {
@@ -287,4 +285,6 @@ done
 
 echo
 echo "First-boot platform setup finished."
+echo "Log saved to ${LOG_FILE}."
+tup finished."
 echo "Log saved to ${LOG_FILE}."
