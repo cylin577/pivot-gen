@@ -173,13 +173,13 @@ do
 	esac
 done
 
-export PI_GEN=${PI_GEN:-pi-gen}
-export PI_GEN_REPO=${PI_GEN_REPO:-https://github.com/RPi-Distro/pi-gen}
-export PI_GEN_RELEASE=${PI_GEN_RELEASE:-Raspberry Pi reference}
+export PI_GEN=${PI_GEN:-pivot-gen}
+export PI_GEN_REPO=${PI_GEN_REPO:-https://github.com/cylin577/pivot-gen}
+export PI_GEN_RELEASE=${PI_GEN_RELEASE:-Pivot OS}
 
 export ARCH=armhf
 export RELEASE=${RELEASE:-trixie} # Don't forget to update stage0/prerun.sh
-export IMG_NAME="${IMG_NAME:-raspios-$RELEASE-$ARCH}"
+export IMG_NAME="${IMG_NAME:-pivotos-$RELEASE-$ARCH}"
 
 export USE_QEMU="${USE_QEMU:-0}"
 export IMG_DATE="${IMG_DATE:-"$(date +%Y-%m-%d)"}"
@@ -202,7 +202,7 @@ export DEPLOY_COMPRESSION=${DEPLOY_COMPRESSION:-zip}
 export COMPRESSION_LEVEL=${COMPRESSION_LEVEL:-6}
 export LOG_FILE="${WORK_DIR}/build.log"
 
-export TARGET_HOSTNAME=${TARGET_HOSTNAME:-raspberrypi}
+export TARGET_HOSTNAME=${TARGET_HOSTNAME:-pivot}
 
 export FIRST_USER_NAME=${FIRST_USER_NAME:-pi}
 export FIRST_USER_PASS

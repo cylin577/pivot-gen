@@ -24,7 +24,7 @@ show_intro() {
 		ip_addr="${ip_addr:-<pi-ip>}"
 		whiptail \
 			--clear \
-			--backtitle "First Boot Self-Host Platform Setup" \
+			--backtitle "Pivot First Boot Setup" \
 			--title "Remote Access" \
 			--msgbox "${network_status}\n\nOpen browser to:\n\nhttp://pivot:${TTYD_PORT}\nhttp://pivot.local:${TTYD_PORT}\nhttp://${ip_addr}:${TTYD_PORT}" \
 			19 70
@@ -32,7 +32,7 @@ show_intro() {
 		network_status="No network detected.\n\nUse Configure Wi-Fi first."
 		whiptail \
 			--clear \
-			--backtitle "First Boot Self-Host Platform Setup" \
+			--backtitle "Pivot First Boot Setup" \
 			--title "Remote Access" \
 			--msgbox "${network_status}" \
 			14 60
@@ -42,7 +42,7 @@ show_intro() {
 show_menu() {
 	whiptail \
 		--clear \
-		--backtitle "First Boot Self-Host Platform Setup" \
+		--backtitle "Pivot First Boot Setup" \
 		--title "Choose Platform" \
 		--menu "Select self-host platform to install." \
 		20 70 10 \

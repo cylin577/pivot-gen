@@ -1,6 +1,6 @@
-# pi-gen
+# pivot-gen
 
-Tool used to create Raspberry Pi OS images, and custom images based on Raspberry Pi OS,
+Tool used to create Pivot OS images, and custom images based on Raspberry Pi OS,
 which was in turn derived from the Raspbian project.
 
 **Note**: Raspberry Pi OS 32 bit images are based primarily on Raspbian, while
@@ -34,7 +34,7 @@ Getting started is as simple as cloning this repository on your build machine. Y
 can do so with:
 
 ```bash
-git clone https://github.com/RPI-Distro/pi-gen.git
+git clone https://github.com/cylin577/pivot-gen.git
 ```
 
 `--depth 1` can be added after `git clone` to create a shallow clone, only containing
@@ -55,13 +55,13 @@ environment variables.
 
 The following environment variables are supported:
 
- * `IMG_NAME` (Default: `raspios-$RELEASE-$ARCH`, for example: `raspios-trixie-armhf`)
+ * `IMG_NAME` (Default: `pivotos-$RELEASE-$ARCH`, for example: `pivotos-trixie-armhf`)
 
    The name of the image to build with the current stage directories. Use this
    variable to set the root name of your OS, eg `IMG_NAME=Frobulator`.
    Export files in stages may add suffixes to `IMG_NAME`.
 
- * `PI_GEN_RELEASE` (Default: `Raspberry Pi reference`)
+ * `PI_GEN_RELEASE` (Default: `Pivot OS`)
 
    The release name to use in `/etc/issue.txt`. The default should only be used
    for official Raspberry Pi builds.
@@ -140,7 +140,7 @@ The following environment variables are supported:
 
    Default system locale.
 
- * `TARGET_HOSTNAME` (Default: 'raspberrypi' )
+ * `TARGET_HOSTNAME` (Default: 'pivot' )
 
    Setting the hostname to the specified value.
 

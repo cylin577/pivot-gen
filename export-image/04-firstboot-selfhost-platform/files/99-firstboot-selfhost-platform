@@ -11,7 +11,7 @@ IP_ADDR="$(hostname -I 2>/dev/null | awk '{print $1}')"
 if [ -n "${IP_ADDR}" ]; then
 cat <<EOF
 
-Self-host platform setup waiting.
+Pivot self-host platform setup waiting.
 Open browser to:
   http://pivot:${TTYD_PORT}
   http://pivot.local:${TTYD_PORT}
@@ -21,7 +21,7 @@ EOF
 else
 cat <<EOF
 
-Self-host platform setup waiting.
+Pivot self-host platform setup waiting.
 No network detected.
 Use local console menu to configure Wi-Fi first.
 
