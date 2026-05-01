@@ -1,0 +1,290 @@
+#!/bin/bash
+set -euo pipefail
+
+STAMP_FILE="/var/lib/firstboot-selfhost-platform.done"
+LOG_FILE="/var/log/firstboot-selfhost-platform.log"
+LOCK_FILE="/run/firstboot-selfhost-platform.lock"
+TTYD_PORT="7681"
+
+mkdir -p "$(dirname "${LOG_FILE}")"
+touch "${LOG_FILE}"
+exec > >(tee -a "${LOG_FILE}") 2>&1
+
+cleanup() {
+	printf '\033[0m\033[2J\033[H'
+	tput cnorm 2>/dev/null || true
+}
+
+show_intro() {
+	local ip_addr network_status
+
+	ip_addr="$(hostname -I 2>/dev/null | awk '{print $1}')"
+	if has_network; then
+		network_status="Network detected."
+		ip_addr="${ip_addr:-<pi-ip>}"
+		whiptail \
+			--clear \
+			--backtitle "First Boot Self-Host Platform Setup" \
+			--title "Remote Access" \
+			--msgbox "${network_status}\n\nOpen browser to:\n\nhttp://pivot:${TTYD_PORT}\nhttp://pivot.local:${TTYD_PORT}\nhttp://${ip_addr}:${TTYD_PORT}" \
+			19 70
+	else
+		network_status="No network detected.\n\nUse Configure Wi-Fi first."
+		whiptail \
+			--clear \
+			--backtitle "First Boot Self-Host Platform Setup" \
+			--title "Remote Access" \
+			--msgbox "${network_status}" \
+			14 60
+	fi
+}
+
+show_menu() {
+	whiptail \
+		--clear \
+		--backtitle "First Boot Self-Host Platform Setup" \
+		--title "Choose Platform" \
+		--menu "Select self-host platform to install." \
+		20 70 10 \
+		1 "1. CasaOS" \
+		2 "2. Runtipi" \
+		3 "3. Skip for now" \
+		4 "4. Configure Wi-Fi" \
+		3>&1 1>&2 2>&3
+}
+
+trap cleanup EXIT INT TERM
+
+export TERM="${TERM:-xterm-256color}"
+export NEWT_COLORS='
+root=white,black
+window=black,gray
+border=black,gray
+textbox=black,gray
+button=black,gray
+actbutton=white,blue
+title=black,gray
+roottext=white,black
+entry=black,gray
+label=black,gray
+compactbutton=black,gray
+listbox=black,gray
+actsellistbox=white,blue
+sellistbox=black,gray
+checkbox=black,gray
+actcheckbox=white,blue
+'
+
+install_casaos() {
+	echo "Installing CasaOS..."
+	ensure_network
+	curl -fsSL https://get.casaos.io | bash
+}
+
+install_runtipi() {
+	echo "Installing Runtipi..."
+	ensure_network
+	curl -L https://setup.runtipi.io | bash
+}
+
+has_network() {
+	ip route get 1.1.1.1 >/dev/null 2>&1
+}
+
+wait_for_network() {
+	local i
+
+	echo "Waiting for network..."
+	for i in $(seq 1 30); do
+		if has_network; then
+			return 0
+		fi
+		sleep 1
+	done
+
+	echo "Network not ready after 30 seconds."
+	return 1
+}
+
+configure_wifi() {
+	local ssid password security_entry security
+
+	if ! command -v nmcli >/dev/null 2>&1; then
+		whiptail --title "Wi-Fi Error" --msgbox "nmcli not found." 10 60
+		return 1
+	fi
+
+	nmcli radio wifi on >/dev/null 2>&1 || true
+	nmcli device wifi rescan >/dev/null 2>&1 || true
+
+	if ! ssid="$(select_wifi_ssid)"; then
+		return 1
+	fi
+
+	security_entry="$(nmcli -t -f SSID,SECURITY device wifi list | awk -F: -v target="${ssid}" '$1 == target {print; exit}')"
+	security="${security_entry#*:}"
+
+	if [ -n "${security}" ] && [ "${security}" != "--" ]; then
+		if ! password="$(whiptail --title "Configure Wi-Fi" --passwordbox "Enter Wi-Fi password for:\n${ssid}" 11 60 3>&1 1>&2 2>&3)"; then
+			return 1
+		fi
+	else
+		password=""
+	fi
+
+	if [ -n "${password}" ]; then
+		if ! nmcli --wait 30 device wifi connect "${ssid}" password "${password}"; then
+			whiptail --title "Wi-Fi Error" --msgbox "Failed to connect to Wi-Fi network." 10 60
+			return 1
+		fi
+	else
+		if ! nmcli --wait 30 device wifi connect "${ssid}"; then
+			whiptail --title "Wi-Fi Error" --msgbox "Failed to connect to open Wi-Fi network." 10 60
+			return 1
+		fi
+	fi
+
+	if wait_for_network; then
+		whiptail --title "Wi-Fi Ready" --msgbox "Wi-Fi connected successfully." 10 60
+		return 0
+	fi
+
+	whiptail --title "Wi-Fi Error" --msgbox "Wi-Fi connected, but network still not ready." 10 60
+	return 1
+}
+
+select_wifi_ssid() {
+	local selection tag
+	local -a menu_items=() ssid_values=()
+
+	while IFS= read -r line; do
+		[ -n "${line}" ] || continue
+		ssid_values+=("${line%%$'\t'*}")
+		tag="${#ssid_values[@]}"
+		menu_items+=("${tag}" "${tag}. ${line#*$'\t'}")
+	done < <(
+		nmcli -t -f SSID,SECURITY,SIGNAL device wifi list | \
+		sort -t: -k3,3nr | \
+		awk -F: '
+			length($1) && !seen[$1]++ {
+				security = ($2 == "" || $2 == "--" ? "open" : $2)
+				signal = ($3 == "" ? "?" : $3)
+				printf "%s\t%s (%s%%)\n", $1, security, signal
+			}
+		'
+	)
+
+	if [ "${#menu_items[@]}" -gt 0 ]; then
+		if ! selection="$(
+			whiptail \
+				--title "Configure Wi-Fi" \
+				--menu "Select Wi-Fi network.\nPress number key to jump to option.\nChoose 0 if SSID not listed." \
+				22 78 12 \
+				"${menu_items[@]}" \
+				0 "0. Hidden/manual entry" \
+				3>&1 1>&2 2>&3
+		)"; then
+			return 1
+		fi
+	else
+		selection="0"
+	fi
+
+	if [ "${selection}" = "0" ]; then
+		if ! selection="$(whiptail --title "Configure Wi-Fi" --inputbox "Enter Wi-Fi SSID:" 10 60 3>&1 1>&2 2>&3)"; then
+			return 1
+		fi
+	else
+		selection="${ssid_values[$((selection - 1))]}"
+	fi
+
+	if [ -z "${selection}" ]; then
+		whiptail --title "Wi-Fi Error" --msgbox "SSID cannot be empty." 10 60
+		return 1
+	fi
+
+	printf '%s\n' "${selection}"
+}
+
+ensure_network() {
+	if has_network; then
+		return 0
+	fi
+
+	if whiptail --title "No Network" --yesno "No network detected.\n\nConfigure Wi-Fi now?" 12 60; then
+		configure_wifi && return 0
+	fi
+
+	return 1
+}
+
+while true; do
+	choice=""
+
+	if [ -e "${STAMP_FILE}" ]; then
+		echo
+		echo "Setup already completed."
+		exit 0
+	fi
+
+	show_intro
+	if ! choice="$(show_menu)"; then
+		choice=3
+	fi
+
+	case "${choice}" in
+		1)
+			exec 9>"${LOCK_FILE}"
+			if ! flock -n 9; then
+				echo
+				echo "Setup already running in another session."
+				sleep 3
+				continue
+			fi
+			if ! install_casaos; then
+				echo
+				echo "CasaOS install failed. Check ${LOG_FILE}, then try again."
+				echo
+				continue
+			fi
+			echo "CasaOS" > "${STAMP_FILE}"
+			echo
+			echo "CasaOS install complete."
+			break
+			;;
+		2)
+			exec 9>"${LOCK_FILE}"
+			if ! flock -n 9; then
+				echo
+				echo "Setup already running in another session."
+				sleep 3
+				continue
+			fi
+			if ! install_runtipi; then
+				echo
+				echo "Runtipi install failed. Check ${LOG_FILE}, then try again."
+				echo
+				continue
+			fi
+			echo "Runtipi" > "${STAMP_FILE}"
+			echo
+			echo "Runtipi install complete."
+			break
+			;;
+		3)
+			echo
+			echo "Skipped. Setup will ask again on next boot."
+			exit 0
+			;;
+		4)
+			configure_wifi || true
+			;;
+		*)
+			echo "Invalid choice. Enter 1, 2, 3, or 4."
+			;;
+	esac
+done
+
+echo
+echo "First-boot platform setup finished."
+echo "Log saved to ${LOG_FILE}."

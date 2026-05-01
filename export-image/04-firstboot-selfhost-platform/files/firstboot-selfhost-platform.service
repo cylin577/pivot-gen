@@ -1,0 +1,21 @@
+[Unit]
+Description=First boot self-host platform installer
+After=systemd-user-sessions.service
+Conflicts=getty@tty1.service console-getty.service
+Before=getty@tty1.service console-getty.service
+ConditionPathExists=!/var/lib/firstboot-selfhost-platform.done
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/firstboot-selfhost-platform
+StandardInput=tty-force
+StandardOutput=inherit
+StandardError=inherit
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

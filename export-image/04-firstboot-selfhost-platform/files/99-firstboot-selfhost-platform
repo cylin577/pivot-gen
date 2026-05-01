@@ -1,0 +1,29 @@
+#!/bin/sh
+set -eu
+
+STAMP_FILE="/var/lib/firstboot-selfhost-platform.done"
+TTYD_PORT="7681"
+
+[ -e "${STAMP_FILE}" ] && exit 0
+
+IP_ADDR="$(hostname -I 2>/dev/null | awk '{print $1}')"
+
+if [ -n "${IP_ADDR}" ]; then
+cat <<EOF
+
+Self-host platform setup waiting.
+Open browser to:
+  http://pivot:${TTYD_PORT}
+  http://pivot.local:${TTYD_PORT}
+  http://${IP_ADDR}:${TTYD_PORT}
+
+EOF
+else
+cat <<EOF
+
+Self-host platform setup waiting.
+No network detected.
+Use local console menu to configure Wi-Fi first.
+
+EOF
+fi
