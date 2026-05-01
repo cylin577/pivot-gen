@@ -4,8 +4,16 @@ install -d "${ROOTFS_DIR}/usr/local/sbin"
 install -m 755 files/firstboot-selfhost-platform "${ROOTFS_DIR}/usr/local/sbin/firstboot-selfhost-platform"
 
 install -d "${ROOTFS_DIR}/usr/local/bin"
-curl -fsSL "https://github.com/tsl0922/ttyd/releases/download/1.7.7/ttyd.aarch64" \
-	-o "${ROOTFS_DIR}/usr/local/bin/ttyd"
+case "${ARCH}" in
+arm64)
+	curl -fsSL "https://github.com/tsl0922/ttyd/releases/download/1.7.7/ttyd.aarch64" \
+		-o "${ROOTFS_DIR}/usr/local/bin/ttyd"
+	;;
+*)
+	echo "Unsupported ARCH for bundled ttyd binary: ${ARCH}" 1>&2
+	exit 1
+	;;
+esac
 chmod 755 "${ROOTFS_DIR}/usr/local/bin/ttyd"
 
 install -d "${ROOTFS_DIR}/etc/systemd/system"

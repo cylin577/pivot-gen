@@ -1,7 +1,11 @@
 #!/bin/bash -e
 
 true > "${ROOTFS_DIR}/etc/apt/sources.list"
-install -m 644 files/raspbian.sources "${ROOTFS_DIR}/etc/apt/sources.list.d/"
+if [ "${ARCH}" = "arm64" ]; then
+	install -m 644 files/debian.sources "${ROOTFS_DIR}/etc/apt/sources.list.d/raspbian.sources"
+else
+	install -m 644 files/raspbian.sources "${ROOTFS_DIR}/etc/apt/sources.list.d/"
+fi
 install -m 644 files/raspi.sources "${ROOTFS_DIR}/etc/apt/sources.list.d/"
 sed -i "s/RELEASE/${RELEASE}/g" "${ROOTFS_DIR}/etc/apt/sources.list.d/raspbian.sources"
 sed -i "s/RELEASE/${RELEASE}/g" "${ROOTFS_DIR}/etc/apt/sources.list.d/raspi.sources"

@@ -6,5 +6,16 @@ if [ "$RELEASE" != "trixie" ]; then
 fi
 
 if [ ! -d "${ROOTFS_DIR}" ]; then
-	bootstrap ${RELEASE} "${ROOTFS_DIR}" http://raspbian.raspberrypi.com/raspbian/
+	case "${ARCH}" in
+	armhf)
+		bootstrap "${RELEASE}" "${ROOTFS_DIR}" http://raspbian.raspberrypi.com/raspbian/
+		;;
+	arm64)
+		bootstrap "${RELEASE}" "${ROOTFS_DIR}" http://deb.debian.org/debian/
+		;;
+	*)
+		echo "Unsupported ARCH: ${ARCH}" 1>&2
+		exit 1
+		;;
+	esac
 fi

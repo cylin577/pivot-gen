@@ -6,18 +6,33 @@ export -f log
 bootstrap(){
 	local BOOTSTRAP_CMD=debootstrap
 	local BOOTSTRAP_ARGS=()
+	local SETARCH_CMD=""
+	local KEYRING="${STAGE_DIR}/files/raspberrypi.gpg"
 
 	export http_proxy=${APT_PROXY}
 
-	BOOTSTRAP_ARGS+=(--arch armhf)
+	if [ "${ARCH}" = "arm64" ]; then
+		KEYRING="/usr/share/keyrings/debian-archive-keyring.gpg"
+	fi
+
+	BOOTSTRAP_ARGS+=(--arch "${ARCH}")
 	BOOTSTRAP_ARGS+=(--components "main,contrib,non-free")
-	BOOTSTRAP_ARGS+=(--keyring "${STAGE_DIR}/files/raspberrypi.gpg")
+	BOOTSTRAP_ARGS+=(--keyring "${KEYRING}")
 	BOOTSTRAP_ARGS+=(--exclude=info,ifupdown)
 	BOOTSTRAP_ARGS+=(--include=ca-certificates)
 	BOOTSTRAP_ARGS+=("$@")
 	printf -v BOOTSTRAP_STR '%q ' "${BOOTSTRAP_ARGS[@]}"
 
-	setarch linux32 capsh $CAPSH_ARG -- -c "'${BOOTSTRAP_CMD}' $BOOTSTRAP_STR" || true
+	case "${ARCH}" in
+	armhf)
+		SETARCH_CMD="setarch linux32 "
+		;;
+	arm64)
+		SETARCH_CMD="setarch linux64 "
+		;;
+	esac
+
+	${SETARCH_CMD}capsh $CAPSH_ARG -- -c "'${BOOTSTRAP_CMD}' $BOOTSTRAP_STR" || true
 	
 	# https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1050719
 	rm -f wget-log*
@@ -79,6 +94,8 @@ unmount_image(){
 export -f unmount_image
 
 on_chroot() {
+	local SETARCH_CMD=""
+
 	if ! mount | grep -q "$(realpath "${ROOTFS_DIR}"/proc)"; then
 		mount -t proc proc "${ROOTFS_DIR}/proc"
 	fi
@@ -103,7 +120,16 @@ on_chroot() {
 		mount -t tmpfs  tmpfs "${ROOTFS_DIR}/tmp"
 	fi
 
-	setarch linux32 capsh $CAPSH_ARG "--chroot=${ROOTFS_DIR}/" -- -e "$@"
+	case "${ARCH}" in
+	armhf)
+		SETARCH_CMD="setarch linux32 "
+		;;
+	arm64)
+		SETARCH_CMD="setarch linux64 "
+		;;
+	esac
+
+	${SETARCH_CMD}capsh $CAPSH_ARG "--chroot=${ROOTFS_DIR}/" -- -e "$@"
 }
 export -f on_chroot
 

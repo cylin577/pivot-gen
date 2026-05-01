@@ -3,11 +3,8 @@
 Tool used to create Pivot OS images, and custom images based on Raspberry Pi OS,
 which was in turn derived from the Raspbian project.
 
-**Note**: Raspberry Pi OS 32 bit images are based primarily on Raspbian, while
-Raspberry Pi OS 64 bit images are based primarily on Debian.
-
-**Note**: 32 bit images should be built from the `master` branch.
-64 bit images should be built from the `arm64` branch.
+**Note**: Pivot OS 32 bit images are based primarily on Raspbian, while
+Pivot OS 64 bit images are based primarily on Debian.
 
 ## Dependencies
 
@@ -55,11 +52,16 @@ environment variables.
 
 The following environment variables are supported:
 
- * `IMG_NAME` (Default: `pivotos-$RELEASE-$ARCH`, for example: `pivotos-trixie-armhf`)
+ * `IMG_NAME` (Default: `pivotos-$RELEASE-$ARCH`, for example: `pivotos-trixie-arm64`)
 
    The name of the image to build with the current stage directories. Use this
    variable to set the root name of your OS, eg `IMG_NAME=Frobulator`.
    Export files in stages may add suffixes to `IMG_NAME`.
+
+ * `ARCH` (Default: `arm64`)
+
+   Target architecture for image build. Use `arm64` for 64-bit images or
+   `armhf` for 32-bit images.
 
  * `PI_GEN_RELEASE` (Default: `Pivot OS`)
 
@@ -428,12 +430,8 @@ follows:
 # Troubleshooting
 
 ## `64 Bit Systems`
-A 64 bit image can be generated from the `arm64` branch in this repository. Just
-replace the command from [this section](#getting-started-with-building-your-images)
-by the one below, and follow the rest of the documentation:
-```bash
-git clone --branch arm64 https://github.com/RPI-Distro/pi-gen.git
-```
+64 bit images are supported directly in this repository. Default build target is
+`arm64`. For 32 bit images, set `ARCH=armhf` when running `build.sh`.
 
 If you want to generate a 64 bits image from a Raspberry Pi running a 32 bits
 version, you need to add `arm_64bit=1` to your `config.txt` file and reboot your

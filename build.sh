@@ -177,7 +177,7 @@ export PI_GEN=${PI_GEN:-pivot-gen}
 export PI_GEN_REPO=${PI_GEN_REPO:-https://github.com/cylin577/pivot-gen}
 export PI_GEN_RELEASE=${PI_GEN_RELEASE:-Pivot OS}
 
-export ARCH=armhf
+export ARCH=${ARCH:-arm64}
 export RELEASE=${RELEASE:-trixie} # Don't forget to update stage0/prerun.sh
 export IMG_NAME="${IMG_NAME:-pivotos-$RELEASE-$ARCH}"
 
