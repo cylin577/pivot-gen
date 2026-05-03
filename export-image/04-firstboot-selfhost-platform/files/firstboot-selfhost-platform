@@ -14,6 +14,140 @@ cleanup() {
 	tput cnorm 2>/dev/null || true
 }
 
+has_dialog_ui() {
+	command -v dialog >/dev/null 2>&1 && [ "${PIVOT_TEXT_UI:-0}" != "1" ]
+}
+
+run_dialog() {
+	dialog \
+		--clear \
+		--backtitle "Pivot First Boot Setup" \
+		"$@"
+}
+
+prompt_enter() {
+	printf '\nPress Enter to continue...' > /dev/tty
+	read -r _ < /dev/tty || true
+}
+
+show_msgbox() {
+	local title="$1" message="$2" height="${3:-12}" width="${4:-60}"
+
+	if has_dialog_ui; then
+		run_dialog --title "${title}" --msgbox "${message}" "${height}" "${width}"
+		return 0
+	fi
+
+	printf '\n[%s]\n%s\n' "${title}" "${message}" > /dev/tty
+	prompt_enter
+}
+
+show_yesno() {
+	local title="$1" message="$2" reply
+
+	if has_dialog_ui; then
+		run_dialog --title "${title}" --yesno "${message}" 12 60
+		return $?
+	fi
+
+	while true; do
+		printf '\n[%s]\n%s\nEnter y or n: ' "${title}" "${message}" > /dev/tty
+		read -r reply < /dev/tty || return 1
+		case "${reply}" in
+			y|Y|yes|YES)
+				return 0
+				;;
+			n|N|no|NO|"")
+				return 1
+				;;
+		esac
+	done
+}
+
+show_inputbox() {
+	local title="$1" prompt="$2" initial="${3:-}" value
+
+	if has_dialog_ui; then
+		run_dialog --stdout --title "${title}" --inputbox "${prompt}" 10 60 "${initial}"
+		return $?
+	fi
+
+	printf '\n[%s]\n%s\n> ' "${title}" "${prompt}" > /dev/tty
+	read -r value < /dev/tty || return 1
+	printf '%s\n' "${value}"
+}
+
+show_passwordbox() {
+	local title="$1" prompt="$2" value
+
+	if has_dialog_ui; then
+		run_dialog --stdout --title "${title}" --passwordbox "${prompt}" 11 60
+		return $?
+	fi
+
+	printf '\n[%s]\n%s\n> ' "${title}" "${prompt}" > /dev/tty
+	stty -echo < /dev/tty
+	read -r value < /dev/tty || {
+		stty echo < /dev/tty
+		printf '\n' > /dev/tty
+		return 1
+	}
+	stty echo < /dev/tty
+	printf '\n' > /dev/tty
+	printf '%s\n' "${value}"
+}
+
+prompt_main_menu() {
+	local menu_msg="$1" choice
+
+	while true; do
+		printf '\nPivot First Boot Setup\n%s\n\n' "${menu_msg}" > /dev/tty
+		printf '1) CasaOS\n2) Runtipi\n3) Skip for now\n4) Configure Wi-Fi\nSelect 1-4: ' > /dev/tty
+		read -r choice < /dev/tty || return 1
+		case "${choice}" in
+			1|2|3|4)
+				printf '%s\n' "${choice}"
+				return 0
+				;;
+		esac
+	done
+}
+
+prompt_wifi_menu() {
+	local -n prompt_menu_items=$1
+	local selection max
+
+	max=$(( ${#prompt_menu_items[@]} / 2 ))
+	while true; do
+		printf '\nConfigure Wi-Fi\n' > /dev/tty
+		printf 'Select Wi-Fi network. Enter number. Use 0 for hidden/manual entry.\n' > /dev/tty
+		while [ "${#prompt_menu_items[@]}" -gt 0 ] && [ "$max" -gt 0 ]; do
+			break
+		done
+		local i=0
+		while [ $i -lt "${#prompt_menu_items[@]}" ]; do
+			printf '%s) %s\n' "${prompt_menu_items[$i]}" "${prompt_menu_items[$((i + 1))]}" > /dev/tty
+			i=$((i + 2))
+		done
+		printf '0) Hidden/manual entry\nSelect: ' > /dev/tty
+		read -r selection < /dev/tty || return 1
+		case "${selection}" in
+			0)
+				printf '0\n'
+				return 0
+				;;
+			''|*[!0-9]*)
+				;;
+			*)
+				if [ "${selection}" -ge 1 ] && [ "${selection}" -le "${max}" ]; then
+					printf '%s\n' "${selection}"
+					return 0
+				fi
+				;;
+		esac
+	done
+}
+
 show_intro() {
 	local ip_addr network_status
 
@@ -24,55 +158,46 @@ show_intro() {
 	ip_addr="$(hostname -I 2>/dev/null | awk '{print $1}')"
 	network_status="Network detected."
 	ip_addr="${ip_addr:-<pi-ip>}"
-	whiptail \
-		--clear \
-		--backtitle "Pivot First Boot Setup" \
-		--title "Remote Access" \
-		--msgbox "${network_status}\n\nOpen browser to:\n\nhttp://pivot:${TTYD_PORT}\nhttp://pivot.local:${TTYD_PORT}\nhttp://${ip_addr}:${TTYD_PORT}" \
+	show_msgbox \
+		"Remote Access" \
+		"${network_status}\n\nOpen browser to:\n\nhttp://pivot:${TTYD_PORT}\nhttp://pivot.local:${TTYD_PORT}\nhttp://${ip_addr}:${TTYD_PORT}" \
 		19 70
 }
 
 show_menu() {
 	local menu_msg="Select self-host platform to install."
+	local selection
 	if ! has_network; then
 		menu_msg="WARNING: No network detected!\nConfigure Wi-Fi before installing platforms.\n\n${menu_msg}"
 	fi
 
-	whiptail \
-		--clear \
-		--backtitle "Pivot First Boot Setup" \
-		--title "Choose Platform" \
-		--menu "${menu_msg}" \
-		20 70 10 \
-		"1" "CasaOS" \
-		"2" "Runtipi" \
-		"3" "Skip for now" \
-		"4" "Configure Wi-Fi" \
-		3>&1 1>&2 2>&3
+	if has_dialog_ui; then
+		if selection="$(
+			run_dialog \
+				--stdout \
+				--title "Choose Platform" \
+				--menu "${menu_msg}" \
+				20 70 10 \
+				"1" "CasaOS" \
+				"2" "Runtipi" \
+				"3" "Skip for now" \
+				"4" "Configure Wi-Fi"
+		)"; then
+			case "${selection}" in
+				1|2|3|4)
+					printf '%s\n' "${selection}"
+					return 0
+					;;
+			esac
+		fi
+	fi
+
+	prompt_main_menu "${menu_msg}"
 }
 
 trap cleanup EXIT INT TERM
 
 export TERM="${TERM:-xterm-256color}"
-export NEWT_COLORS='
-root=white,black
-window=black,lightgray
-border=black,lightgray
-textbox=black,lightgray
-button=black,lightgray
-actbutton=white,blue
-title=black,lightgray
-roottext=white,black
-entry=black,lightgray
-label=black,lightgray
-compactbutton=black,lightgray
-listbox=black,lightgray
-actsellistbox=white,blue
-sellistbox=black,lightgray
-checkbox=black,lightgray
-actcheckbox=white,blue
-'
-
 install_casaos() {
 	echo "Installing CasaOS..." | tee -a "${LOG_FILE}"
 	ensure_network
@@ -108,7 +233,7 @@ configure_wifi() {
 	local ssid password security_entry security
 
 	if ! command -v nmcli >/dev/null 2>&1; then
-		whiptail --title "Wi-Fi Error" --msgbox "nmcli not found." 10 60
+		show_msgbox "Wi-Fi Error" "nmcli not found." 10 60
 		return 1
 	fi
 
@@ -123,7 +248,7 @@ configure_wifi() {
 	security="${security_entry#*:}"
 
 	if [ -n "${security}" ] && [ "${security}" != "--" ]; then
-		if ! password="$(whiptail --title "Configure Wi-Fi" --passwordbox "Enter Wi-Fi password for:\n${ssid}" 11 60 3>&1 1>&2 2>&3)"; then
+		if ! password="$(show_passwordbox "Configure Wi-Fi" "Enter Wi-Fi password for:\n${ssid}")"; then
 			return 1
 		fi
 	else
@@ -132,22 +257,22 @@ configure_wifi() {
 
 	if [ -n "${password}" ]; then
 		if ! nmcli --wait 30 device wifi connect "${ssid}" password "${password}"; then
-			whiptail --title "Wi-Fi Error" --msgbox "Failed to connect to Wi-Fi network." 10 60
+			show_msgbox "Wi-Fi Error" "Failed to connect to Wi-Fi network." 10 60
 			return 1
 		fi
 	else
 		if ! nmcli --wait 30 device wifi connect "${ssid}"; then
-			whiptail --title "Wi-Fi Error" --msgbox "Failed to connect to open Wi-Fi network." 10 60
+			show_msgbox "Wi-Fi Error" "Failed to connect to open Wi-Fi network." 10 60
 			return 1
 		fi
 	fi
 
 	if wait_for_network; then
-		whiptail --title "Wi-Fi Ready" --msgbox "Wi-Fi connected successfully." 10 60
+		show_msgbox "Wi-Fi Ready" "Wi-Fi connected successfully." 10 60
 		return 0
 	fi
 
-	whiptail --title "Wi-Fi Error" --msgbox "Wi-Fi connected, but network still not ready." 10 60
+	show_msgbox "Wi-Fi Error" "Wi-Fi connected, but network still not ready." 10 60
 	return 1
 }
 
@@ -173,23 +298,29 @@ select_wifi_ssid() {
 	)
 
 	if [ "${#menu_items[@]}" -gt 0 ]; then
-		if ! selection="$(
-			whiptail \
-				--title "Configure Wi-Fi" \
-				--menu "Select Wi-Fi network.\nPress number key to jump to option.\nChoose 0 if SSID not listed." \
-				22 78 12 \
-				"${menu_items[@]}" \
-				0 "0. Hidden/manual entry" \
-				3>&1 1>&2 2>&3
-		)"; then
-			return 1
+		if has_dialog_ui; then
+			if ! selection="$(
+				run_dialog \
+					--stdout \
+					--title "Configure Wi-Fi" \
+					--menu "Select Wi-Fi network.\nPress number key to jump to option.\nChoose 0 if SSID not listed." \
+					22 78 12 \
+					"${menu_items[@]}" \
+					0 "0. Hidden/manual entry"
+			)"; then
+				return 1
+			fi
+		else
+			if ! selection="$(prompt_wifi_menu menu_items)"; then
+				return 1
+			fi
 		fi
 	else
 		selection="0"
 	fi
 
 	if [ "${selection}" = "0" ]; then
-		if ! selection="$(whiptail --title "Configure Wi-Fi" --inputbox "Enter Wi-Fi SSID:" 10 60 3>&1 1>&2 2>&3)"; then
+		if ! selection="$(show_inputbox "Configure Wi-Fi" "Enter Wi-Fi SSID:")"; then
 			return 1
 		fi
 	else
@@ -197,7 +328,7 @@ select_wifi_ssid() {
 	fi
 
 	if [ -z "${selection}" ]; then
-		whiptail --title "Wi-Fi Error" --msgbox "SSID cannot be empty." 10 60
+		show_msgbox "Wi-Fi Error" "SSID cannot be empty." 10 60
 		return 1
 	fi
 
@@ -209,7 +340,7 @@ ensure_network() {
 		return 0
 	fi
 
-	if whiptail --title "No Network" --yesno "No network detected.\n\nConfigure Wi-Fi now?" 12 60; then
+	if show_yesno "No Network" "No network detected.\n\nConfigure Wi-Fi now?"; then
 		configure_wifi && return 0
 	fi
 
@@ -285,6 +416,4 @@ done
 
 echo
 echo "First-boot platform setup finished."
-echo "Log saved to ${LOG_FILE}."
-tup finished."
 echo "Log saved to ${LOG_FILE}."

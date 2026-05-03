@@ -6,7 +6,11 @@ SBOM_FILE="${STAGE_WORK_DIR}/${IMG_FILENAME}${IMG_SUFFIX}.sbom"
 BMAP_FILE="${STAGE_WORK_DIR}/${IMG_FILENAME}${IMG_SUFFIX}.bmap"
 
 on_chroot <<- EOF
-	update-initramfs -k all -c
+	if command -v update-initramfs >/dev/null 2>&1; then
+		update-initramfs -k all -c
+	else
+		echo "warning: update-initramfs missing; skipping initramfs regeneration" 1>&2
+	fi
 	if hash hardlink 2>/dev/null; then
 		hardlink -t /usr/share/doc
 	fi
@@ -31,7 +35,11 @@ rm -f "${ROOTFS_DIR}/usr/bin/qemu-arm-static"
 
 if [ "${USE_QEMU}" != "1" ]; then
 	if [ -e "${ROOTFS_DIR}/etc/ld.so.preload.disabled" ]; then
-		mv "${ROOTFS_DIR}/etc/ld.so.preload.disabled" "${ROOTFS_DIR}/etc/ld.so.preload"
+		if [ "${ARCH}" = "arm64" ] && grep -q "arm-linux-gnueabihf" "${ROOTFS_DIR}/etc/ld.so.preload.disabled"; then
+			rm "${ROOTFS_DIR}/etc/ld.so.preload.disabled"
+		else
+			mv "${ROOTFS_DIR}/etc/ld.so.preload.disabled" "${ROOTFS_DIR}/etc/ld.so.preload"
+		fi
 	fi
 fi
 

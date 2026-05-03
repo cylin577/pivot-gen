@@ -26,12 +26,6 @@ fi
 
 install -m 644 files/raspberrypi-archive-keyring.pgp "${ROOTFS_DIR}/usr/share/keyrings/"
 on_chroot <<- \EOF
-	ARCH="$(dpkg --print-architecture)"
-	if [ "$ARCH" = "armhf" ]; then
-		dpkg --add-architecture arm64
-	elif [ "$ARCH" = "arm64" ]; then
-		dpkg --add-architecture armhf
-	fi
 	apt-get update
 	apt-get dist-upgrade -y
 EOF

@@ -1,6 +1,5 @@
 Types: deb
 URIs: http://deb.debian.org/debian/
-Architectures: arm64
 Suites: RELEASE
 Components: main contrib non-free non-free-firmware
 Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
