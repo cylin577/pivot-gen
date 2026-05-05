@@ -1,0 +1,108 @@
+#!/usr/bin/env python3
+import sys
+import os
+import subprocess
+import shutil
+
+def get_info():
+    print("--- Pivot OS Info ---")
+    if os.path.exists("/etc/rpi-issue"):
+        with open("/etc/rpi-issue", "r") as f:
+            print(f.read().strip())
+    else:
+        print("Release info not found.")
+    
+    # CPU Temp
+    try:
+        with open("/sys/class/thermal/thermal_zone0/temp", "r") as f:
+            temp = int(f.read().strip()) / 1000
+            print(f"CPU Temp: {temp:.1f}°C")
+    except:
+        pass
+
+    # Arch
+    arch = subprocess.check_output(["uname", "-m"]).decode().strip()
+    print(f"Architecture: {arch}")
+
+    # Memory
+    with open("/proc/meminfo", "r") as f:
+        lines = f.readlines()
+        total = lines[0].split()[1]
+        free = lines[1].split()[1]
+        print(f"Memory: {int(free)//1024}/{int(total)//1024} MB free")
+
+def update_sys():
+    print("Updating Pivot OS...")
+    try:
+        subprocess.run(["sudo", "apt", "update"], check=True)
+        subprocess.run(["sudo", "apt", "dist-upgrade", "-y"], check=True)
+        print("Update complete.")
+    except subprocess.CalledProcessError as e:
+        print(f"Update failed: {e}")
+
+def upgrade_pivot():
+    print("Checking for Pivot Module updates...")
+    repo_path = "/opt/pivot/src"
+    if not os.path.exists(repo_path):
+        print(f"Error: {repo_path} not found. OTA setup missing.")
+        return
+
+    try:
+        os.chdir(repo_path)
+        print("Pulling latest changes...")
+        subprocess.run(["git", "pull"], check=True)
+        
+        deploy_script = "./deploy.sh"
+        if os.path.exists(deploy_script):
+            print("Running deployment script...")
+            subprocess.run(["sudo", "bash", deploy_script], check=True)
+            print("Pivot Modules upgraded successfully.")
+        else:
+            print("No deploy.sh found. Pull complete.")
+    except subprocess.CalledProcessError as e:
+        print(f"Upgrade failed: {e}")
+
+def check_health():
+    print("--- Service Health ---")
+    services = [
+        "firstboot-selfhost-platform.service",
+        "firstboot-selfhost-platform-ttyd.service",
+        "ssh.service",
+        "avahi-daemon.service"
+    ]
+    for svc in services:
+        status = subprocess.run(["systemctl", "is-active", svc], capture_output=True, text=True).stdout.strip()
+        print(f"{svc}: {status}")
+
+def show_help():
+    print("Usage: pivot [COMMAND]")
+    print("\nCommands:")
+    print("  info     Show system information")
+    print("  update   Update system packages (apt)")
+    print("  upgrade  Upgrade Pivot modules (OTA)")
+    print("  health   Check status of core services")
+    print("  help     Show this help message")
+
+def main():
+    if len(sys.argv) < 2:
+        show_help()
+        sys.exit(0)
+
+    cmd = sys.argv[1]
+    if cmd == "info":
+        get_info()
+    elif cmd == "update":
+        update_sys()
+    elif cmd == "upgrade":
+        upgrade_pivot()
+    elif cmd == "health":
+        check_health()
+    elif cmd == "help" or cmd == "--help":
+        show_help()
+    else:
+        print(f"Unknown command: {cmd}")
+        show_help()
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
